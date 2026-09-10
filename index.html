@@ -285,7 +285,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background-im
    PENGATURAN — ganti API dengan URL Web App Apps Script Anda
    ============================================================ */
 const API  = 'https://script.google.com/macros/s/AKfycbwOzwjn3MqSZakcxfNCIYOsitsdzepwF-FqYfsnF-CUTAn77OeS-t8xk5oij8M2sDGl/exec';
-const ZONA = 'Asia/Makassar';
+const ZONA = 'Asia/Jakarta';
 
 const PORSI = {
   pk: { nama:'Kecil', ket:'PAUD–SD 3' },
@@ -334,7 +334,7 @@ function tanggalHariIni(){
   return new Intl.DateTimeFormat('en-CA',
     {timeZone:ZONA,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 }
-function keDate(ymd){ const b=ymd.split('-'); return new Date(+b[0],+b[1]-1,+b[2]); }
+function keDate(ymd){ const b=ymd.split('-'); return new Date(Date.UTC(+b[0],+b[1]-1,+b[2],12,0,0)); }
 function esc(t){ return String(t==null?'':t).replace(/[<>&"]/g,function(c){
   return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); }
 function adaIsi(g){ return !!(g && (g.energi||g.protein||g.lemak||g.karbohidrat||g.serat)); }
