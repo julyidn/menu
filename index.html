@@ -277,7 +277,26 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;background-im
   <footer class="kaki">
     Disiapkan di dapur <b>SPPG Larangan Gaga</b><br>
     Yayasan Srikandi Maju Bersama · Yayasan Saka Kinasih Nusantara <br> Badan Gizi Nasional
-  </footer>
+
+    <!-- Kontainer Ikon Sosial Media -->
+    <div class="sosmed-kaki" style="margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 15px;">
+      
+      <!-- TikTok -->
+      <a href="https://www.tiktok.com/@sppglarangangaga" target="_blank" rel="noopener noreferrer" aria-label="TikTok" style="color: inherit; text-decoration: none; display: inline-flex;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.04-.1z"/>
+        </svg>
+      </a>
+
+      <!-- Instagram -->
+      <a href="https://www.instagram.com/sppglarangangaga" target="_blank" rel="noopener noreferrer" aria-label="Instagram" style="color: inherit; text-decoration: none; display: inline-flex;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+        </svg>
+      </a>
+
+    </div>
+</footer>
 </div>
 
 <script>
@@ -455,24 +474,66 @@ function apiSiap(){
     gagal('Konstanta API di index.html belum diisi dengan URL Web App Apps Script.');
     return;
   }
+
+  /*
+   * PENTING:
+   * Halaman publik TIDAK boleh memakai data menu dari tanggal lama
+   * sebagai pengganti tanggal hari ini. Sebelumnya, ketika fetch gagal,
+   * kode membaca localStorage lalu menjalankan tampilkan(c.hariIni).
+   * Akibatnya menu tanggal sebelumnya bisa terlihat seolah-olah menu hari ini.
+   *
+   * Sekarang:
+   * 1. Ambil data langsung dari API untuk tanggal hari ini.
+   * 2. Tambahkan cache-buster agar browser tidak menyajikan response lama.
+   * 3. Validasi tanggal dan tampilkan HANYA record yang tanggalnya sama
+   *    dengan hari ini.
+   * 4. Jika API gagal / kosong, tampilkan "Menu belum tersedia".
+   * 5. Tidak ada fallback ke localStorage atau tanggal sebelumnya.
+   */
   const hariIni = tanggalHariIni();
-  fetch(API + '?tanggal=' + hariIni)
-    .then(function(r){ return r.json(); })
+  const url = API + '?tanggal=' + encodeURIComponent(hariIni)
+                    + '&segar=1&_ts=' + Date.now();
+
+  fetch(url, {
+    method: 'GET',
+    cache: 'no-store'
+  })
+    .then(function(r){
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then(function(data){
-      if(!data.ok) throw new Error('gagal');
-      dataMinggu = data.minggu || [];
-      try{ localStorage.setItem('menu-sppg', JSON.stringify({hariIni:hariIni,minggu:dataMinggu})); }catch(e){}
+      if(!data || !data.ok) throw new Error('Respons API tidak valid.');
+
+      const semua = Array.isArray(data.minggu) ? data.minggu : [];
+
+      // Normalisasi tanggal agar perbandingan konsisten.
+      dataMinggu = semua.filter(function(m){
+        return m && typeof m === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(String(m.tanggal || ''));
+      });
+
+      // Pastikan record aktif selalu dicari berdasarkan tanggal HARI INI.
+      // Jika API hanya mengirim data tanggal lain, hasilnya tetap kosong.
+      const adaMenuHariIni = dataMinggu.some(function(m){
+        return String(m.tanggal) === hariIni && !!m.makanan_pokok;
+      });
+
       tampilkan(hariIni);
+
+      // Jika API mengembalikan minggu tetapi hari ini belum diinput,
+      // halaman tetap boleh menampilkan navigasi hari lain yang memang
+      // memiliki menu, namun TIDAK pernah mengganti hari aktif ke tanggal lama.
+      if(!adaMenuHariIni){
+        menuAktif = null;
+      }
     })
     .catch(function(){
-      let simpan = null;
-      try{ simpan = localStorage.getItem('menu-sppg'); }catch(e){}
-      if(simpan){
-        const c = JSON.parse(simpan);
-        dataMinggu = c.minggu || [];
-        const punya = dataMinggu.some(function(m){ return m.tanggal===hariIni; });
-        tampilkan(punya ? hariIni : c.hariIni);
-      } else gagal();
+      // Jangan mengambil localStorage/cache tanggal lama.
+      // Jika server tidak bisa diakses, keadaan paling aman adalah
+      // menyatakan menu hari ini belum tersedia.
+      dataMinggu = [];
+      menuAktif = null;
+      tampilkan(hariIni);
     });
 })();
 </script>
