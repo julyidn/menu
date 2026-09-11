@@ -356,6 +356,38 @@ function tanggalHariIni(){
 function keDate(ymd){ const b=ymd.split('-'); return new Date(Date.UTC(+b[0],+b[1]-1,+b[2],12,0,0)); }
 function esc(t){ return String(t==null?'':t).replace(/[<>&"]/g,function(c){
   return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); }
+
+
+function ambilIdDrive(url){
+  const s = String(url||'');
+  let m = s.match(/\/file\/d\/([a-zA-Z0-9_-]{20,})/);
+  if(m) return m[1];
+  m = s.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if(m) return m[1];
+  m = s.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  return m ? m[1] : '';
+}
+function normalisasiFoto(nilai){
+  if(nilai==null) return '';
+  const s = String(nilai).trim();
+  if(!s) return '';
+  if(/^data:image\//i.test(s) || /^blob:/i.test(s)) return s;
+  const driveId = ambilIdDrive(s);
+  if(driveId) return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(driveId)+'&sz=w1600';
+  if(/^https?:\/\//i.test(s)) return s;
+  if(/^[a-zA-Z0-9_-]{20,}$/.test(s))
+    return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(s)+'&sz=w1600';
+  return s;
+}
+function sumberFoto(menu){
+  if(!menu || typeof menu!=='object') return '';
+  return normalisasiFoto(
+    menu.foto || menu.foto_url || menu.fotoUrl ||
+    menu.image || menu.image_url || menu.gambar ||
+    menu.gambar_url || menu.foto_id || menu.image_id || ''
+  );
+}
+
 function adaIsi(g){ return !!(g && (g.energi||g.protein||g.lemak||g.karbohidrat||g.serat)); }
 
 function gambarKepala(ymd){
@@ -365,10 +397,11 @@ function gambarKepala(ymd){
 }
 
 function blokFoto(menu){
-  if(!menu.foto) return '';
+  const foto = sumberFoto(menu);
+  if(!foto) return '';
   const alt = 'Foto menu ' + [menu.makanan_pokok, menu.lauk_hewani].filter(Boolean).join(', ');
   return '<div class="foto">'
-    + '<img src="'+esc(menu.foto)+'" alt="'+esc(alt)+'" loading="eager" '
+    + '<img src="'+esc(foto)+'" alt="'+esc(alt)+'" loading="eager" '
     + 'onerror="this.closest(\'.foto\').remove()">'
     + '</div>';
 }
@@ -510,6 +543,10 @@ function apiSiap(){
       // Normalisasi tanggal agar perbandingan konsisten.
       dataMinggu = semua.filter(function(m){
         return m && typeof m === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(String(m.tanggal || ''));
+      }).map(function(m){
+        const foto = sumberFoto(m);
+        if(foto) m.foto = foto;
+        return m;
       });
 
       // Pastikan record aktif selalu dicari berdasarkan tanggal HARI INI.

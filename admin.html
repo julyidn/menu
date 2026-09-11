@@ -284,6 +284,38 @@ function geserMinggu(senin, n){
 function esc(t){ return String(t==null?'':t).replace(/[<>&"]/g,function(c){
   return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); }
 
+
+
+function ambilIdDrive(url){
+  const s = String(url||'');
+  let m = s.match(/\/file\/d\/([a-zA-Z0-9_-]{20,})/);
+  if(m) return m[1];
+  m = s.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if(m) return m[1];
+  m = s.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  return m ? m[1] : '';
+}
+function normalisasiFoto(nilai){
+  if(nilai==null) return '';
+  const s = String(nilai).trim();
+  if(!s) return '';
+  if(/^data:image\//i.test(s) || /^blob:/i.test(s)) return s;
+  const driveId = ambilIdDrive(s);
+  if(driveId) return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(driveId)+'&sz=w1600';
+  if(/^https?:\/\//i.test(s)) return s;
+  if(/^[a-zA-Z0-9_-]{20,}$/.test(s))
+    return 'https://drive.google.com/thumbnail?id='+encodeURIComponent(s)+'&sz=w1600';
+  return s;
+}
+function sumberFoto(menu){
+  if(!menu || typeof menu!=='object') return '';
+  return normalisasiFoto(
+    menu.foto || menu.foto_url || menu.fotoUrl ||
+    menu.image || menu.image_url || menu.gambar ||
+    menu.gambar_url || menu.foto_id || menu.image_id || ''
+  );
+}
+
 function pesan(teks, jenis){
   const p = el('pesan');
   p.textContent = teks;
@@ -355,8 +387,14 @@ function muatMinggu(){
     .then(function(r){ return r.json(); })
     .then(function(d){
       if(!d.ok) throw new Error(d.pesan);
-      minggu = d.minggu || [];
-      if(!minggu.some(function(m){ return m.tanggal===tglAktif; })) tglAktif = minggu[0].tanggal;
+      minggu = Array.isArray(d.minggu) ? d.minggu.map(function(m){
+        if(m && typeof m === 'object'){
+          const foto = sumberFoto(m);
+          if(foto) m.foto = foto;
+        }
+        return m;
+      }) : [];
+      if(minggu.length && !minggu.some(function(m){ return m && m.tanggal===tglAktif; })) tglAktif = minggu[0].tanggal;
       gambarNav();
       gambarBorang();
     })
@@ -474,10 +512,11 @@ function gambarBorang(){
 /* ---------- Foto ---------- */
 function gambarFoto(){
   const m = menuAktif();
-  const tampil = fotoBaru || (fotoDihapus ? null : m.foto);
+  const fotoTersimpan = fotoDihapus ? '' : sumberFoto(m);
+  const tampil = fotoBaru || fotoTersimpan;
 
   el('kotakFoto').innerHTML = tampil
-    ? '<img class="foto-pratinjau" src="'+esc(tampil)+'" alt="Pratinjau foto menu">'
+    ? '<img class="foto-pratinjau" src="'+esc(tampil)+'" alt="Pratinjau foto menu" loading="eager" onerror="this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<p>Foto tersimpan tetapi alamat gambarnya tidak dapat dimuat.</p>\');">'
       + '<div class="foto-aksi">'
       + '<button class="tombol-garis" id="gantiFoto">Ganti foto</button>'
       + '<button class="tombol-lembut" id="buangFoto">Hapus foto</button></div>'
@@ -569,7 +608,7 @@ function simpan(){
     return;
   }
 
-  data.fotoLama  = m.foto_id || '';
+  data.fotoLama  = m.foto_id || m.fotoId || ambilIdDrive(m.foto||m.foto_url||'') || '';
   data.fotoBaru  = fotoBaru || '';
   data.hapusFoto = fotoDihapus && !fotoBaru;
 
